@@ -1,9 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from socket import *
 from struct import *
 from binascii import hexlify
 import sys
+
+import json
+
+from pprint import pprint
 
 def parse_mndp(data):
     entry = {}
@@ -19,19 +23,22 @@ def parse_mndp(data):
         # MAC
         if type == 1:
             (mac,) = unpack_from('6s', data, pos)
-            entry['mac'] = "%02x:%02x:%02x:%02x:%02x:%02x" % tuple(ord(x) for x in mac)
+#            for x in mac:
+#                pprint(x)
+            entry['mac'] = "%02x:%02x:%02x:%02x:%02x:%02x" % tuple(x for x in mac)
+#            pprint(entry['mac'])
 
         # Identity
         elif type == 5:
-            entry['id'] = data[pos:pos + length]
+            entry['id'] = data[pos:pos + length].decode("utf-8")
 
         # Platform
         elif type == 8:
-            entry['platform'] = data[pos:pos + length]
+            entry['platform'] = data[pos:pos + length].decode("utf-8")
 
         # Version
         elif type == 7:
-            entry['version'] = data[pos:pos + length]
+            entry['version'] = data[pos:pos + length].decode("utf-8")
 
         # uptime?
         elif type == 10:
@@ -40,18 +47,23 @@ def parse_mndp(data):
 
         # hardware
         elif type == 12:
-            entry['hardware'] = data[pos:pos + length]
+            entry['hardware'] = data[pos:pos + length].decode("utf-8")
 
         # softid
         elif type == 11:
-            entry['softid'] = data[pos:pos + length]
+            entry['softid'] = data[pos:pos + length].decode("utf-8")
 
         # ifname
         elif type == 16:
-            entry['ifname'] = data[pos:pos + length]
+            entry['ifname'] = data[pos:pos + length].decode("utf-8")
+
+        # ipv4 address
+        elif type == 17:
+            (ipv4,) = unpack_from('4s', data, pos)
+            entry['ipv4'] = "%d.%d.%d.%d" % tuple(x for x in ipv4)
 
         else:
-            entry['unknown-%d' % type] = hexlify(data[pos:pos + length])
+            entry['unknown-%d' % type] = hexlify(data[pos:pos + length]).decode("utf-8")
 
         pos += length
 
@@ -64,25 +76,28 @@ def mndp_scan():
     cs.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
     cs.bind(('', 5678))
 
-    cs.sendto('\0\0\0\0', ('255.255.255.255', 5678))
+    cs.sendto(b'\0\0\0\0', ('255.255.255.255', 5678))
 
     try:
         entries = {}
         while True:
             (data, src_addr) = cs.recvfrom(1500)
             # ignore the msg we getourselves
-            if data == '\0\0\0\0':
-                continue
+#            if data == '\0\0\0\0':
+#                continue
 
             if len(data) < 18:
                 continue
             entry = parse_mndp(data)
-            if not entries.has_key(entry['mac']):
-                print "Reply from:", src_addr, len(data)
-                print " %(mac)s, ID: %(id)s" % entry
-                print "  Ver: %(version)s, HW: %(hardware)s, Uptime: %(uptime)d" % entry
-                print "  SoftID: %(softid)s, IF: %(ifname)s, Platform: %(platform)s" % entry
-                entries[entry['mac']] = entry
+            print(json.dumps(entry))
+#            pprint(entry)
+            print("")
+#            if entry['mac'] not in entries:
+#                print("Reply from:", src_addr, len(data))
+#                print(" %(mac)s, ID: %(id)s" % entry)
+#                print(" Platform: %(platform)s,  Ver: %(version)s, HW: %(hardware)s, Uptime: %(uptime)d" % entry)
+#                print("  SoftID: %(softid)s, IF: %(ifname)s, Platform: %(platform)s" % entry)
+#                entries[entry['mac']] = entry
 
 
 
